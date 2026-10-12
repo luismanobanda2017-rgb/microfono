@@ -1,0 +1,1 @@
+#define BOARD_SCREEN_COMBO 501 // Pantalla redonda para Seeed Studio XIAO (GC9A01)
