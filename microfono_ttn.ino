@@ -7,7 +7,7 @@
 #include <InternalFileSystem.h>
 
 using namespace Adafruit_LittleFS_Namespace;
-
+//Regitro1 de microfono funcionando correctamente
 // ============================================================
 // WIO-SX1262
 // ============================================================
