@@ -2,12 +2,20 @@
 #include <SPI.h>
 #include <PDM.h>
 #include <RadioLib.h>
+//Registro2 pantalla prueba 1
+#include <TFT_eSPI.h>
 
 #include <Adafruit_LittleFS.h>
 #include <InternalFileSystem.h>
 
 using namespace Adafruit_LittleFS_Namespace;
-//Regitro1 de microfono funcionando correctamente
+
+// ============================================================
+// PANTALLA REDONDA
+// ============================================================
+
+TFT_eSPI tft = TFT_eSPI();
+
 // ============================================================
 // WIO-SX1262
 // ============================================================
@@ -144,6 +152,54 @@ void detener(
 }
 
 // ============================================================
+// PANTALLA - DIBUJAR MENSAJE CENTRADO
+// ============================================================
+
+void mostrarEnPantalla(
+  const char* linea1,
+  const char* linea2,
+  const char* linea3,
+  const char* linea4
+) {
+
+  tft.fillScreen(TFT_BLACK);
+
+  // Titulo
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextColor(TFT_CYAN, TFT_BLACK);
+  tft.setTextSize(2);
+
+  tft.drawString(
+    "MONITOREO",
+    120,
+    60
+  );
+
+  tft.drawString(
+    "LABORATORIO",
+    120,
+    90
+  );
+
+  // Separador
+  tft.drawFastHLine(
+    40,
+    115,
+    160,
+    TFT_DARKGREY
+  );
+
+  // Datos
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.setTextSize(2);
+
+  tft.drawString(linea1, 120, 140);
+  tft.drawString(linea2, 120, 170);
+  tft.drawString(linea3, 120, 200);
+  tft.drawString(linea4, 120, 230);
+}
+
+// ============================================================
 // INICIALIZAR MEMORIA FLASH
 // ============================================================
 
@@ -184,6 +240,8 @@ bool guardarBuffer(
 
   InternalFS.remove(nombre);
 
+  // ⚠️ FIX: usar namespace completo para evitar conflicto
+  // entre Adafruit_LittleFS_Namespace::File y fs::File
   Adafruit_LittleFS_Namespace::File archivo(InternalFS);
 
   if (!archivo.open(nombre, FILE_O_WRITE)) {
@@ -230,6 +288,8 @@ bool leerBuffer(
     return false;
   }
 
+  // ⚠️ FIX: usar namespace completo para evitar conflicto
+  // entre Adafruit_LittleFS_Namespace::File y fs::File
   Adafruit_LittleFS_Namespace::File archivo(InternalFS);
 
   if (!archivo.open(nombre, FILE_O_READ)) {
@@ -699,40 +759,6 @@ void setup() {
     delay(10);
   }
 
-  // ==========================================================
-  // BORRAR NONCES Y SESION VIEJOS (SOLO ESTA VEZ)
-  // ==========================================================
-  // Estas 3 lineas borran la memoria flash para evitar el
-  // error -1116 "DevNonce ya utilizado".
-  //
-  // DESPUES DE QUE FUNCIONE EL JOIN:
-  //   1. QUITA o COMENTA estas 3 lineas
-  //   2. Vuelve a subir el codigo
-  // ==========================================================
-  //InternalFS.begin();
-  //InternalFS.remove("/lorawan_nonces.bin");
-  //InternalFS.remove("/lorawan_session.bin");
-  // ==========================================================
-
-  Serial.println();
-  Serial.println(
-    "================================="
-  );
-
-  Serial.println(
-    "Wio-SX1262 Audio LoRaWAN"
-  );
-
-  Serial.println("AU915 / FSB2");
-
-  Serial.println(
-    "RadioLib + persistencia LoRaWAN"
-  );
-
-  Serial.println(
-    "================================="
-  );
-
   // ----------------------------------------------------------
   // FLASH
   // ----------------------------------------------------------
@@ -743,17 +769,9 @@ void setup() {
   if (!sistemaArchivosOK) {
 
     Serial.println();
-    Serial.println(
-      "ADVERTENCIA:"
-    );
-
-    Serial.println(
-      "No hay almacenamiento persistente."
-    );
-
-    Serial.println(
-      "No se continuara para evitar reutilizar DevNonce."
-    );
+    Serial.println("ADVERTENCIA:");
+    Serial.println("No hay almacenamiento persistente.");
+    Serial.println("No se continuara para evitar reutilizar DevNonce.");
 
     while (true) {
       delay(1000);
@@ -761,10 +779,26 @@ void setup() {
   }
 
   // ----------------------------------------------------------
-  // RADIO
+  // RADIO (PRIMERO, antes que la pantalla)
   // ----------------------------------------------------------
 
   configurarRadio();
+
+  // ----------------------------------------------------------
+  // PANTALLA REDONDA (DESPUÉS del radio)
+  // ----------------------------------------------------------
+
+  tft.init();
+  tft.setRotation(0);
+  tft.fillScreen(TFT_BLACK);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+
+  mostrarEnPantalla(
+    "Iniciando...",
+    "Cargando",
+    "modulos",
+    "Espere"
+  );
 
   // ----------------------------------------------------------
   // LORAWAN
@@ -779,12 +813,22 @@ void setup() {
   configurarMicrofono();
 
   Serial.println();
-
-  Serial.println(
-    "Sistema iniciado"
-  );
+  Serial.println("=================================");
+  Serial.println("Wio-SX1262 Audio LoRaWAN");
+  Serial.println("AU915 / FSB2");
+  Serial.println("RadioLib + persistencia LoRaWAN");
+  Serial.println("=================================");
 
   Serial.println();
+  Serial.println("Sistema iniciado");
+  Serial.println();
+
+  mostrarEnPantalla(
+    "Sistema",
+    "Iniciado",
+    "Esperando",
+    "datos..."
+  );
 }
 
 // ============================================================
@@ -897,6 +941,41 @@ void loop() {
   );
 
   // ----------------------------------------------------------
+  // MOSTRAR EN PANTALLA
+  // ----------------------------------------------------------
+
+  char linea1[20];
+  char linea2[20];
+  char linea3[20];
+
+  snprintf(
+    linea1,
+    sizeof(linea1),
+    "AVG: %lu",
+    (unsigned long)promedio
+  );
+
+  snprintf(
+    linea2,
+    sizeof(linea2),
+    "PEAK: %u",
+    pico
+  );
+
+  snprintf(
+    linea3,
+    sizeof(linea3),
+    "Enviando..."
+  );
+
+  mostrarEnPantalla(
+    "Datos listos",
+    linea1,
+    linea2,
+    linea3
+  );
+
+  // ----------------------------------------------------------
   // TRANSMITIR
   // ----------------------------------------------------------
 
@@ -929,6 +1008,13 @@ void loop() {
 
     Serial.println(estado);
 
+    mostrarEnPantalla(
+      "Error TX",
+      linea1,
+      linea2,
+      "Sin enlace"
+    );
+
   }
 
   else if (estado > 0) {
@@ -939,12 +1025,26 @@ void loop() {
 
     Serial.println(estado);
 
+    mostrarEnPantalla(
+      "TX OK",
+      linea1,
+      linea2,
+      "Con downlink"
+    );
+
   }
 
   else {
 
     Serial.println(
       "LoRaWAN uplink OK - sin downlink"
+    );
+
+    mostrarEnPantalla(
+      "TX OK",
+      linea1,
+      linea2,
+      "Enviado a TTN"
     );
   }
 }
